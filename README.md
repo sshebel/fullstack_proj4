@@ -29,6 +29,23 @@ I chose to create sessions as children of a conference.  This facilitates findin
 
 I chose to represent the speaker as an entity for several reasons: the speaker name may not be unique and may not be entered in a consistent manner, defining the speaker as an entity allows storing additional information such as a bio and contact information. It also allowed me to store a list of the session keys for the sessions the speaker is presenting. This facilitates queries from the perspective of the speaker.
 
+### Session Entity Properties (Key id will be auto allocated, parent=conference)
+* speaker - required StringProperty containing the key id (email) for the speaker
+* date - requred DateProperty containing the date (YYYY-MM-DD) of the session
+* time - required TimeProperty containing the start time (HH:MM) of the session.  Separating the date and time enables queries for sessions at specific times of the day or on a specific date.
+* duration - required IntegerProperty specifying the length of the session
+* location - required StringProperty containing the location of the session
+* name - required StringProperty containing the name of the session
+* sessionType - StringProperty that defaults to lecture if not provided.  This will be converted to an EnumField when presented to the user to provide a limited choice of values.
+* description - optional TextProperty allowing an unlimited length entry that wil not be indexed.
+* maxAttendees - IntegerProperty that will default to 0 when session is creation
+* seatsAvailable - IntegerProperty that will be set equal to maxAttendees when session is created.
+
+### Speaker Entity Properties (Key id=mainEmail, no parent)
+* displayName - required StringProperty 
+* mainEmail - required StringProperty containing the speaker's email.  This is assumed to be unique and will be used as the key id.
+* bio - optional TextProperty allowing unlimited length entry that will not be indexed.
+* sessionKeys - repeated StringProperty that contains a list of the websafekeys for the sessions at which this speaker is speaking.  
 
 ## Task 2: Add Sessions to User Wishlist
 I chose to allow users to add a session to their wishlist regardless of whether they were registered for the associated conference.  This may allow targeted advertising for perspective conference attendees.
