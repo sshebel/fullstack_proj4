@@ -162,34 +162,21 @@ class ConferenceApi(remote.Service):
         return announcement
     
     @staticmethod
-    def _cacheFeaturedSpeaker(c_urlsafeKey):
+    def _cacheFeaturedSpeaker(c_urlsafeKey,speaker_id):
         """ Cache a featured speaker and associated sessions for a conference
             Called from getFeaturedSpeaker and CreateFeaturedSpeaker(from the task queue)
         """
+        logging.info("speaker id=%s"%speaker_id)
         c_key = ndb.Key(urlsafe=c_urlsafeKey)
         sessionlist = Session.query(ancestor=c_key).fetch()
-        # count the number of sessions for each speaker
         memstring=""
-        if sessionlist:
-          spkrdict={}
-          for session in sessionlist:
-            if session.speaker in spkrdict:
-                spkrdict[session.speaker]+=1
-            else:
-                spkrdict[session.speaker] = 1
-          speakers = namedtuple('speakers','speaker numSessions')
-          #find the speaker with the most sessions
-          mostSessions = sorted([speakers(k,v) for (k,v) in spkrdict.items()],reverse=True)
-        
-          # if there is a speaker with more than 2 session, create and cache a featured speaker message
-          if mostSessions[0].numSessions >= 2:   
-            featuredsessions=[]
-            for session in sessionlist:
-                if session.speaker == mostSessions[0].speaker:
+        featuredsessions=[]
+        for session in sessionlist:
+            if session.speaker == speaker_id:
                     featuredsessions.append(session.name)
-            memstring = 'Featured speaker,%s, will be leading the following sessions %s' % (
-                ndb.Key(Speaker,mostSessions[0].speaker).get().displayName,
-                ', '.join(featuredsessions))
+        memstring = 'Featured speaker,%s, will be leading the following sessions %s' % (
+            ndb.Key(Speaker,speaker_id).get().displayName,
+            ', '.join(featuredsessions))
         if memstring:
             memcache.set("featuredspeaker-%s"%c_urlsafeKey,memstring)
         return(memstring)
@@ -560,18 +547,26 @@ class ConferenceApi(remote.Service):
                  if ndb.Key(urlsafe=wskey).parent()==c_key:
                      logging.info("session id=%d"%ndb.Key(urlsafe=wskey).id())
                      count+=1    
+ 
+        # create Session 
+        try:
+            Session(**data).put()
+            spkr.sessionKeys.append(s_key.urlsafe())
+            spkr.put()
+        except:
+            raise endpoints.BadRequestException("Database update failed")
+
         # if speaker is presenting 2 or more sessions
         # add a task to check if this speaker is now a featured speaker
         if count >= 2:             
-            taskqueue.add(params={'conference': c_key.urlsafe()},url='/tasks/featuredSpeaker')
-        # create Session & return SessionForm
-        Session(**data).put()
-        spkr.sessionKeys.append(s_key.urlsafe())
-        spkr.put()
+            taskqueue.add(params={'conference': c_key.urlsafe(),'speaker':data['speaker']},url='/tasks/featuredSpeaker')
+        #send email to creator
         taskqueue.add(params={'email': user.email(),
             'sessionInfo': repr(request)},
             url='/tasks/send_confirmation_email'
         )
+
+        #return session form
         return self._copySessionToForm(s_key.get())
     
     def _copySessionToForm(self, session):
@@ -592,7 +587,7 @@ class ConferenceApi(remote.Service):
         return ses
     
     def _getSessionQuery(self, request, parent=None):
-        """Return formatted query from the submitted filters."""
+        """Return formatted session query from the submitted filters."""
         if parent != None:
             q = Session.query(ancestor=parent)
         else:
@@ -626,7 +621,7 @@ class ConferenceApi(remote.Service):
             http_method='POST',
             name='querySessions')
     def querySessions(self, request):
-        """Query for conferences."""
+        """Query for sessions."""
         sessions = self._getSessionQuery(request)
 
         # return individual SessionForm object per Session
@@ -659,7 +654,7 @@ class ConferenceApi(remote.Service):
             http_method='POST',
             name='queryConferenceSessions')
     def queryConferenceSessions(self, request):
-        """Query for conferences."""
+        """Query for conference sessions."""
         sessions = self._getSessionQuery(request,ndb.Key(urlsafe=request.websafeKey))
 
         # return individual SessionForm object per Session
@@ -740,7 +735,7 @@ class ConferenceApi(remote.Service):
             path='confsessiontype/{websafeKey}/{sType}',
             http_method='GET', name='getConferenceSessionsByType')
     def getConferenceSessionsByType(self, request):
-        """Return sessions for requested conference (by websafeKey)."""
+        """Return sessions for requested conference (by websafeKey) and session type (sType)."""
         # get Conference object from request; bail if not found
         try:
             c_key = ndb.Key(urlsafe=request.websafeKey)
@@ -780,14 +775,11 @@ class ConferenceApi(remote.Service):
             path='featuredSpeaker/{websafeKey}',
             http_method='GET', name='getFeaturedSpeaker')
     def getFeaturedSpeaker(self, request):
-        """ Get the featured speaker info for the specified conference, check the cache first """
+        """ Get the featured speaker info for the specified conference from memcache """
         c_key = ndb.Key(urlsafe=request.websafeKey)
         fspeaker = memcache.get("featuredspeaker-%s"%request.websafeKey)
-        if fspeaker is not None:
-            return StringMessage(data=fspeaker)
-        else:
-            return StringMessage(data=self._cacheFeaturedSpeaker(request.websafeKey))
-        
+        return StringMessage(data=fspeaker)
+                
     @endpoints.method(GET_REQUEST, SessionForms,
             path='getspeakersessions/{websafeKey}',
             http_method='GET', name='getSpeakerSessions')

@@ -62,7 +62,7 @@ I created 2 queries: querySessions() and queryConferenceSessions(), both of whic
 The problem is to find sessions that are not workshops and start before 7pm.  This would require inequality filters on two different properties which is not supported by the App Engine Datastore.  My proposed solution is to perform a query to return all the sessions that start before 7pm.  I would then iterate through the results to find all the non-workshop sessions.
 
 ## Task 4: Add a Task
-Per the instructions, added code to _createSessionObject() to check if the speaker for the new session is presenting at 2 or more sessions at the specified conference.  If he/she is, a push task, using the default queue, is added to run CacheFeaturedSpeaker.  CacheFeatureSpeaker calls _cacheFeaturedSpeaker() which identifies the speaker with the most sessions for the specified conference and creates a featured speaker announcement in memcache.
+Per the instructions, added code to _createSessionObject() to check if the speaker for the new session is presenting at 2 or more sessions at the specified conference.  If he/she is, a push task, using the default queue, is added to run CacheFeaturedSpeaker.  CacheFeatureSpeaker calls _cacheFeaturedSpeaker() which creates a featured speaker announcement in memcache.
 
 
 

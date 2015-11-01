@@ -29,7 +29,7 @@ class SendConfirmationEmailHandler(webapp2.RequestHandler):
 class CacheFeaturedSpeaker(webapp2.RequestHandler):
     def post(self):
         """Cache a featured speaker and sessions for a conference"""
-        ConferenceApi()._cacheFeaturedSpeaker(self,self.request.get('conference'))
+        ConferenceApi()._cacheFeaturedSpeaker(self.request.get('conference'),self.request.get('speaker'))
         
 app = webapp2.WSGIApplication([
     ('/crons/set_announcement', SetAnnouncementHandler),
